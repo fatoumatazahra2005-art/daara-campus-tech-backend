@@ -1,0 +1,28 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('modules', function (Blueprint $table) {
+            $table->id();
+            $table->string('titre', 150);
+            $table->text('description')->nullable();
+            $table->unsignedInteger('ordre');
+            $table->boolean('actif')->default(true);
+            $table->foreignId('cours_id')->constrained('cours')->cascadeOnDelete();
+            $table->timestamps();
+
+            $table->unique(['cours_id', 'ordre']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('modules');
+    }
+};
