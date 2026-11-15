@@ -46,6 +46,14 @@ class InscriptionCours extends Model
         return $this->hasMany(ProgressionChapitre::class, 'inscription_cours_id');
     }
 
+    public function progressionsEtapesProjetGuide(): HasMany
+    {
+        return $this->hasMany(
+            ProgressionEtapeProjetGuide::class,
+            'inscription_cours_id'
+        );
+    }
+
     public function certificat(): HasOne
     {
         return $this->hasOne(Certificat::class, 'inscription_cours_id');
@@ -54,5 +62,9 @@ class InscriptionCours extends Model
     public function inscriptionsParcours(): BelongsToMany
     {
         return $this->belongsToMany(InscriptionParcours::class, 'inscription_parcours_cours', 'inscription_cours_id', 'inscription_parcours_id')->using(InscriptionParcoursCours::class)->withTimestamps();
+    }
+    public function aStatut(string ...$statuts): bool
+    {
+        return in_array($this->statut?->value, $statuts, true);
     }
 }

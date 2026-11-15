@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AStatut;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,14 +12,16 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 /** Cours créé par un encadreur, validé par un administrateur. Le nom de table « cours » est invariable. */
 class Cours extends Model
 {
+    use AStatut;
     protected $table = 'cours';
 
     protected $fillable = [
         'titre',
         'description',
         'niveau_id',
-        'langue',
+        'langue_id',
         'est_certifiant',
+        'image_couverture',
         'statut_id',
         'motif_refus',
         'date_creation',
@@ -26,12 +29,16 @@ class Cours extends Model
         'auteur_id',
         'technologie_id',
         'valide_par_id',
+        'a_relire',
+        'modifie_le',
     ];
 
     protected $casts = [
         'est_certifiant' => 'boolean',
         'date_creation' => 'date',
         'date_publication' => 'date',
+        'a_relire' => 'boolean',
+        'modifie_le' => 'datetime',
     ];
 
     public function auteur(): BelongsTo
@@ -54,6 +61,11 @@ class Cours extends Model
         return $this->belongsTo(CodeList::class, 'niveau_id');
     }
 
+    public function langue(): BelongsTo
+    {
+        return $this->belongsTo(CodeList::class, 'langue_id');
+    }
+
     public function statut(): BelongsTo
     {
         return $this->belongsTo(CodeList::class, 'statut_id');
@@ -71,7 +83,10 @@ class Cours extends Model
 
     public function parcours(): BelongsToMany
     {
-        return $this->belongsToMany(Parcours::class, 'parcours_cours', 'cours_id', 'parcours_id')->using(ParcoursCours::class)->withPivot(['ordre', 'obligatoire'])->withTimestamps();
+        return $this->belongsToMany(Parcours::class, 'parcours_cours', 'cours_id', 'parcours_id')
+            ->using(ParcoursCours::class)
+            ->withPivot(['ordre', 'obligatoire'])
+            ->withTimestamps();
     }
 
     public function inscriptions(): HasMany

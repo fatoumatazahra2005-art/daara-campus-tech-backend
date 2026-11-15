@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AStatut;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Table rendus_projet. */
 class RenduProjet extends Model
 {
+    use AStatut;
     protected $table = 'rendus_projet';
 
     protected $fillable = [

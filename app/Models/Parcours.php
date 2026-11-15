@@ -15,6 +15,7 @@ class Parcours extends Model
     protected $fillable = [
         'titre',
         'description',
+        'image',
         'statut_id',
         'date_creation',
     ];
@@ -26,6 +27,13 @@ class Parcours extends Model
     public function statut(): BelongsTo
     {
         return $this->belongsTo(CodeList::class, 'statut_id');
+    }
+
+    public function aStatut(string ...$valeurs): bool
+    {
+        $this->loadMissing('statut');
+
+        return in_array($this->statut?->value, $valeurs, true);
     }
 
     public function cours(): BelongsToMany

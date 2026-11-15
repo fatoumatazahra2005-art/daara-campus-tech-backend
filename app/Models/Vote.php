@@ -10,8 +10,8 @@ class Vote extends Model
 {
     protected $table = 'votes';
 
-    protected $primaryKey = null;
-    public $incrementing = false;
+    protected $primaryKey = 'id';
+    public $incrementing = true; // clé id auto-incrémentée ; le couple (utilisateur_id, message_id) reste unique
 
     protected $fillable = [
         'utilisateur_id',

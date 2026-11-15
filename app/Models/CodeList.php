@@ -42,9 +42,14 @@ class CodeList extends Model
     /** Identifiant d'une valeur : CodeList::idOf('StatutCours', 'BROUILLON'). */
     public static function idOf(string $type, string $value): int
     {
-        return self::$ids["{$type}.{$value}"] ??= (int) static::query()
-            ->where('type', $type)
-            ->where('value', $value)
-            ->valueOrFail('id');
+        return self::$ids["{$type}.{$value}"] ??= (int) (
+            static::query()
+                ->where('type', $type)
+                ->where('value', $value)
+                ->value('id')
+            ?? throw new \RuntimeException(
+            "Valeur CodeList introuvable : {$type}.{$value}"
+        )
+        );
     }
 }

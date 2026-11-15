@@ -45,4 +45,9 @@ class TentativeQuiz extends Model
     {
         return $this->hasMany(ReponseApprenant::class, 'tentative_id');
     }
+
+    public function aStatut(string ...$statuts): bool
+    {
+        return in_array($this->statut?->value, $statuts, true);
+    }
 }

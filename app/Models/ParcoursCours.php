@@ -10,7 +10,7 @@ class ParcoursCours extends Pivot
 {
     protected $table = 'parcours_cours';
 
-    public $incrementing = false;
+    public $incrementing = true;
 
     protected $fillable = [
         'parcours_id',

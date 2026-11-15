@@ -13,6 +13,12 @@ class Technologie extends Model
     protected $fillable = [
         'nom',
         'description',
+        'actif',
+        'icone',
+    ];
+
+    protected $casts = [
+        'actif' => 'boolean',
     ];
 
     public function cours(): HasMany

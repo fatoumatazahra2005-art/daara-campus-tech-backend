@@ -94,4 +94,13 @@ class Utilisateur extends Authenticatable
     {
         return $this->hasMany(Signalement::class, 'utilisateur_id');
     }
+    /** Le téléphone est toujours enregistré au format +221771234567 (s'il est valide). */
+    protected function telephone(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            set: fn (?string $valeur) => blank($valeur)
+                ? null
+                : (\App\Support\Telephone::normaliser($valeur) ?? $valeur),
+        );
+    }
 }

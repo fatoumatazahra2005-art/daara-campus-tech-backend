@@ -41,4 +41,14 @@ class FormuleAbonnement extends Model
     {
         return $this->hasMany(PeriodeAbonnement::class, 'formule_id');
     }
+
+    public function dureeMois(): ?int
+    {
+        return match ($this->periodicite?->value) {
+            'MENSUEL' => 1,
+            'SEMESTRIEL' => 6,
+            'ANNUEL' => 12,
+            default => null,
+        };
+    }
 }

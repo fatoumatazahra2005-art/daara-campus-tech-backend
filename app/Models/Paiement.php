@@ -43,4 +43,9 @@ class Paiement extends Model
     {
         return $this->belongsTo(CodeList::class, 'statut_id');
     }
+
+    public function aStatut(string ...$statuts): bool
+    {
+        return in_array($this->statut?->value, $statuts, true);
+    }
 }

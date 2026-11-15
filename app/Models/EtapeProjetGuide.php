@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Table etapes_projet_guide. */
 class EtapeProjetGuide extends Model
@@ -27,5 +28,13 @@ class EtapeProjetGuide extends Model
     public function chapitre(): BelongsTo
     {
         return $this->belongsTo(Chapitre::class, 'chapitre_id');
+    }
+
+    public function progressions(): HasMany
+    {
+        return $this->hasMany(
+            ProgressionEtapeProjetGuide::class,
+            'etape_projet_guide_id'
+        );
     }
 }

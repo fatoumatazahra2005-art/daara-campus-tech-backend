@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AStatut;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /** Table inscriptions_parcours. */
 class InscriptionParcours extends Model
 {
+    use AStatut;
     protected $table = 'inscriptions_parcours';
 
     protected $fillable = [
