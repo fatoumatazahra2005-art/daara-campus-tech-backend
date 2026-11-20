@@ -296,6 +296,9 @@ Route::prefix('v1')->group(function () {
                     'destroy'
                 ]);
 
+                Route::patch('projets/{projet}/activer', [ProjetController::class, 'activer']);
+                Route::patch('projets/{projet}/desactiver', [ProjetController::class, 'desactiver']);
+
 
                 // Modération du forum
                 Route::get('signalements', [

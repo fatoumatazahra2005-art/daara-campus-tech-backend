@@ -6,6 +6,7 @@ use App\Exceptions\RegleMetierException;
 use App\Models\Chapitre;
 use App\Models\EtapeProjetGuide;
 use App\Models\Module;
+use App\Models\ProjetGuide;
 use App\Models\Proposition;
 use App\Models\Question;
 use App\Models\Quiz;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Activation / désactivation (suppression logique, règle 3) du contenu d'un cours :
- * modules, chapitres, quiz, questions, propositions. Les données liées sont conservées.
+ * modules, chapitres, quiz, questions, propositions, projets guidés et leurs étapes. Les données liées sont conservées.
  * Les contrôles reprennent ceux de la soumission (CoursService::soumettre / validerQuiz),
  * pour que le cours reste toujours soumissible.
  */
@@ -53,6 +54,8 @@ class ActivationContenuService
                 $element instanceof Quiz => $actif ? $this->peutActiverQuiz($element) : null,
                 $element instanceof Question => $actif ? $this->peutActiverQuestion($element) : $this->peutDesactiverQuestion($element),
                 $element instanceof Proposition => $this->peutChangerProposition($element, $actif),
+                $element instanceof ProjetGuide => $actif ? $this->peutActiverProjetGuide($element) : null,
+                $element instanceof EtapeProjetGuide => $actif ? $this->peutActiverEtape($element) : $this->peutDesactiverEtape($element),
                 default => throw new \InvalidArgumentException(class_basename($element).' ne peut pas être activé ou désactivé.'),
             };
 
@@ -66,6 +69,8 @@ class ActivationContenuService
 
         // Règle 4 : recalcul des inscriptions EN_COURS, après la transaction.
         // Seuls les modules, chapitres et quiz changent ce qu'il faut terminer.
+        // Projet guidé et étapes : ils ne sont vérifiés qu'au moment de terminer un chapitre ;
+        // un chapitre déjà terminé le reste (même principe que pour un quiz ajouté après coup).
         if ($change && ($element instanceof Module || $element instanceof Chapitre || $element instanceof Quiz)) {
             $this->progression->recalculerCours($this->cours->coursDe($element)->id);
         }
@@ -201,6 +206,64 @@ class ActivationContenuService
         $this->verifierPropositions($question, $propositions);
     }
 
+    // ============== Projets guidés ==============
+
+    /** Un projet guidé actif a au moins une étape active, liée à un chapitre actif d'un module actif. */
+    private function peutActiverProjetGuide(ProjetGuide $projet): void
+    {
+        $etapes = EtapeProjetGuide::with('chapitre.module')
+            ->where('projet_guide_id', $projet->id)
+            ->where('actif', true)
+            ->get();
+
+        if ($etapes->isEmpty()) {
+            throw new RegleMetierException('Ce projet guidé n’a aucune étape active : activez ou ajoutez d’abord une étape.');
+        }
+
+        foreach ($etapes as $etape) {
+            $this->exigerChapitreActif($etape);
+        }
+    }
+
+    // ============== Étapes de projet guidé ==============
+
+    /** Un projet guidé actif garde au moins une étape active. */
+    private function peutDesactiverEtape(EtapeProjetGuide $etape): void
+    {
+        if (! $etape->projetGuide?->actif) {
+            return;
+        }
+
+        $autres = EtapeProjetGuide::where('projet_guide_id', $etape->projet_guide_id)
+            ->where('id', '!=', $etape->id)
+            ->where('actif', true)
+            ->exists();
+
+        if (! $autres) {
+            throw new RegleMetierException('C’est la dernière étape active du projet guidé : désactivez plutôt le projet guidé.');
+        }
+    }
+
+    /** Une étape réactivée doit être liée à un chapitre actif d'un module actif. */
+    private function peutActiverEtape(EtapeProjetGuide $etape): void
+    {
+        $etape->loadMissing('chapitre.module');
+        $this->exigerChapitreActif($etape);
+    }
+
+    private function exigerChapitreActif(EtapeProjetGuide $etape): void
+    {
+        $chapitre = $etape->chapitre;
+
+        if (! $chapitre || ! $chapitre->actif || ! $chapitre->module?->actif) {
+            $consigne = mb_strimwidth((string) $etape->consigne, 0, 50, '…');
+
+            throw new RegleMetierException(
+                "L’étape « {$consigne} » est liée à un chapitre inactif : associez-la d’abord à un chapitre actif."
+            );
+        }
+    }
+
     // ============== Outils ==============
 
     private function propositionsActives(Question $question): Collection
@@ -234,15 +297,18 @@ class ActivationContenuService
         }
     }
 
-    /** Une étape de projet guidé ne peut pas pointer vers un chapitre inactif. */
+    /** Une étape active d'un projet guidé actif ne peut pas pointer vers un chapitre inactif. */
     private function exigerSansEtapeProjet(Collection $chapitreIds, string $sujet): void
     {
         if ($chapitreIds->isEmpty()) {
             return;
         }
 
+        // Seules les étapes actives d'un projet guidé actif comptent : une étape désactivée ne bloque plus le chapitre.
         $etape = EtapeProjetGuide::with('projetGuide')
             ->whereIn('chapitre_id', $chapitreIds)
+            ->where('actif', true)
+            ->whereHas('projetGuide', fn ($q) => $q->where('actif', true))
             ->first();
 
         if ($etape) {

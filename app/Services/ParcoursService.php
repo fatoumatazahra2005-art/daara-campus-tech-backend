@@ -12,11 +12,15 @@ use Illuminate\Support\Facades\Storage;
 /**
  * Parcours gérés par l'administrateur.
  * Cycle de vie : BROUILLON → PUBLIE → ARCHIVE (définitif).
+ *
+ * Règle 5 : un parcours ne passe à PUBLIE que s'il contient au moins 2 cours, au moins un cours obligatoire,
+ * tous ses cours obligatoires PUBLIE, et au moins un projet actif.
  */
 class ParcoursService
 {
-    /** Relations chargées pour le détail (cours avec leur statut, pour signaler ceux non publiés). */
-    /** Relations chargées pour le détail (cours avec leur statut, projets avec leur nombre de rendus). */
+    private const MIN_COURS_PUBLICATION = 2;
+
+    /** Relations chargées pour le détail : cours avec leur statut, projets (actifs d'abord) avec leur nombre de rendus. */
     private function relationsDetail(): array
     {
         return [
@@ -24,11 +28,9 @@ class ParcoursService
             'cours.statut',
             'cours.technologie',
             'cours.niveau',
-            'projets' => fn ($q) => $q->withCount('rendus')->orderBy('id'),
+            'projets' => fn ($q) => $q->withCount('rendus')->orderByDesc('actif')->orderBy('id'),
         ];
     }
-
-    private const MIN_COURS_PUBLICATION = 2;
 
     // =====================================================================
     // Lecture
@@ -43,7 +45,12 @@ class ParcoursService
 
         // cours.technologie : nécessaire pour afficher les logos des technologies sur les cartes.
         $requete = Parcours::with(['statut', 'cours.technologie'])
-            ->withCount(['cours', 'projets', 'inscriptions']);
+            ->withCount([
+                'cours',
+                'projets',
+                'projets as projets_actifs_count' => fn ($q) => $q->where('actif', true),
+                'inscriptions',
+            ]);
 
         if (!empty($filtres['recherche'])) {
             $recherche = '%' . trim($filtres['recherche']) . '%';
@@ -134,7 +141,8 @@ class ParcoursService
     // =====================================================================
 
     /**
-     * Publier un parcours : brouillon, au moins 2 cours tous publiés, au moins 1 projet final.
+     * Publier un parcours (règle 5) : brouillon, au moins 2 cours, au moins un cours obligatoire,
+     * tous les cours obligatoires publiés, au moins un projet actif.
      */
     public function publier(int $id): Parcours
     {
@@ -153,20 +161,35 @@ class ParcoursService
                 );
             }
 
-            // Tous les cours doivent être accessibles aux apprenants.
+            // Cours obligatoires du parcours (colonne obligatoire de la table d'association).
+            $obligatoires = DB::table('parcours_cours')
+                ->where('parcours_id', $parcours->id)
+                ->where('obligatoire', true)
+                ->pluck('cours_id')
+                ->map(fn ($id) => (int) $id);
+
+            // Sans cours obligatoire, le parcours ne pourrait jamais être terminé.
+            if ($obligatoires->isEmpty()) {
+                throw new RegleMetierException('Un parcours doit contenir au moins un cours obligatoire pour être publié.');
+            }
+
+            // Règle 5 : tous les cours obligatoires doivent être publiés (un cours facultatif peut être en revalidation).
             $nonPublies = $parcours->cours
-                ->filter(fn ($cours) => $cours->statut?->value !== 'PUBLIE')
+                ->filter(fn ($cours) => $obligatoires->contains((int) $cours->id) && $cours->statut?->value !== 'PUBLIE')
                 ->pluck('titre');
 
             if ($nonPublies->isNotEmpty()) {
                 throw new RegleMetierException(
-                    'Ces cours ne sont pas publiés : « ' . $nonPublies->implode(' », « ')
-                    . ' ». Retirez-les du parcours ou attendez leur validation.'
+                    'Ces cours obligatoires ne sont pas publiés : « ' . $nonPublies->implode(' », « ')
+                    . ' ». Rendez-les facultatifs, retirez-les du parcours ou attendez leur validation.'
                 );
             }
 
-            if (!$parcours->projets()->exists()) {
-                throw new RegleMetierException('Un parcours doit posséder au moins un projet final pour être publié.');
+            // Règle 5 : le projet final est ce qui distingue un parcours d'une simple liste de cours.
+            if (!$parcours->projets()->where('actif', true)->exists()) {
+                throw new RegleMetierException(
+                    'Ajoutez ou activez au moins un projet à ce parcours avant de le publier : c’est le projet final qui valide le parcours.'
+                );
             }
 
             $parcours->update(['statut_id' => $this->statutId('PUBLIE')]);
@@ -177,7 +200,7 @@ class ParcoursService
 
     /**
      * Archiver un parcours publié : retiré du catalogue, définitif.
-     * Les apprenants déjà inscrits conservent leur progression.
+     * Les apprenants déjà inscrits conservent leur progression et le terminent.
      */
     public function archiver(int $id): Parcours
     {
@@ -217,7 +240,7 @@ class ParcoursService
             }
 
             if ($parcours->projets()->exists()) {
-                throw new RegleMetierException('Supprimez d\'abord le projet final de ce parcours.');
+                throw new RegleMetierException('Supprimez d\'abord les projets de ce parcours.');
             }
 
             if ($parcours->image) {

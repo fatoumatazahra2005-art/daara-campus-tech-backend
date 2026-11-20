@@ -13,12 +13,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Projet guidé (fil rouge) porté par un cours, avec ses étapes. Il fait partie de la création du cours.
  * Règle 3 : tant que le cours n'a jamais été publié, le projet et ses étapes se suppriment réellement ;
- * une fois le cours publié, ils ne sont plus supprimés (les progressions des apprenants y sont liées).
+ * une fois le cours publié, supprimer() les désactive (actif = false) : les progressions des apprenants
+ * sont conservées. activer() / desactiver() passent par ActivationContenuService (mêmes contrôles).
  */
 class ProjetGuideService
 {
-    public function __construct(private readonly CoursService $cours)
-    {
+    public function __construct(
+        private readonly CoursService $cours,
+        private readonly ActivationContenuService $activation,
+    ) {
     }
 
     public function creer(Cours $cours, array $donnees): ProjetGuide
@@ -51,20 +54,38 @@ class ProjetGuideService
         });
     }
 
-    /** Suppression réelle, seulement si le cours n'a jamais été publié (règle 3). */
-    public function supprimer(ProjetGuide $projet): void
+    /**
+     * ProjetGuide.supprimer() : suppression réelle si le cours n'a jamais été publié ;
+     * sinon, équivaut à desactiver().
+     *
+     * @return string « supprime » ou « desactive »
+     */
+    public function supprimer(ProjetGuide $projet): string
     {
-        DB::transaction(function () use ($projet) {
-            $cours = $projet->cours;
+        $cours = $projet->cours;
 
-            $this->exigerJamaisPublie(
-                $cours,
-                'Ce cours a déjà été publié : son projet guidé ne peut plus être supprimé, car des apprenants peuvent l’avoir commencé. Vous pouvez encore modifier ses informations et ses étapes.'
-            );
+        if ($cours->date_publication !== null) {
+            $this->activation->desactiver($projet);
 
+            return 'desactive';
+        }
+
+        DB::transaction(function () use ($projet, $cours) {
             $projet->delete();
             $this->cours->marquerModifie($cours);
         });
+
+        return 'supprime';
+    }
+
+    public function activer(ProjetGuide $projet): ProjetGuide
+    {
+        return $this->activation->activer($projet)->load('etapes');
+    }
+
+    public function desactiver(ProjetGuide $projet): ProjetGuide
+    {
+        return $this->activation->desactiver($projet)->load('etapes');
     }
 
     public function ajouterEtape(ProjetGuide $projet, array $donnees): EtapeProjetGuide
@@ -107,32 +128,38 @@ class ProjetGuideService
         });
     }
 
-    /** Suppression réelle, seulement si le cours n'a jamais été publié (règle 3). */
-    public function retirerEtape(EtapeProjetGuide $etape): void
+    /**
+     * EtapeProjetGuide.supprimer() : suppression réelle si le cours n'a jamais été publié ;
+     * sinon, équivaut à desactiver().
+     *
+     * @return string « supprime » ou « desactive »
+     */
+    public function retirerEtape(EtapeProjetGuide $etape): string
     {
-        DB::transaction(function () use ($etape) {
-            $cours = $etape->projetGuide->cours;
+        $cours = $etape->projetGuide->cours;
 
-            $this->exigerJamaisPublie(
-                $cours,
-                'Ce cours a déjà été publié : cette étape ne peut plus être supprimée, car des apprenants peuvent l’avoir commencée. Vous pouvez encore modifier sa consigne.'
-            );
+        if ($cours->date_publication !== null) {
+            $this->activation->desactiver($etape);
 
+            return 'desactive';
+        }
+
+        DB::transaction(function () use ($etape, $cours) {
             $etape->delete();
             $this->cours->marquerModifie($cours);
         });
+
+        return 'supprime';
     }
 
-    // =====================================================================
-    // Contrôles
-    // =====================================================================
-
-    /** Règle 3 : un cours déjà publié (date_publication renseignée) ne perd plus son contenu. */
-    private function exigerJamaisPublie(Cours $cours, string $message): void
+    public function activerEtape(EtapeProjetGuide $etape): EtapeProjetGuide
     {
-        if ($cours->date_publication !== null) {
-            throw new RegleMetierException($message);
-        }
+        return $this->activation->activer($etape);
+    }
+
+    public function desactiverEtape(EtapeProjetGuide $etape): EtapeProjetGuide
+    {
+        return $this->activation->desactiver($etape);
     }
 
     /** Le chapitre lié à une étape doit appartenir au cours qui porte le projet guidé. */

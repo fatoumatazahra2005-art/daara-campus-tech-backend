@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
  * Inscription aux parcours, progression des parcours et attribution des projets.
  * Règle 5 : si un cours d'un parcours publié repasse en validation, le parcours reste publié
  * et ce cours reste accessible à ses inscrits.
+ * Règle 29 : seuls les projets actifs sont attribués et exigés ; un projet désactivé garde ses rendus.
  * Parcours archivé : il sort du catalogue (plus de nouvelle inscription), mais ses inscrits
  * le continuent jusqu'au bout (cours, progression, projets).
  */
@@ -31,10 +32,15 @@ class ParcoursSuiviService
      * - tous les parcours PUBLIE ;
      * - pour un apprenant donné : aussi les parcours ARCHIVE auxquels il est inscrit,
      *   pour qu'il puisse ouvrir leur fiche et les terminer.
+     * Seuls les projets actifs sont présentés.
      */
     public function catalogue(?int $apprenantId = null)
     {
-        return Parcours::with(['statut', 'projets', 'cours' => fn ($q) => $q->with('statut', 'technologie')])
+        return Parcours::with([
+            'statut',
+            'projets' => fn ($q) => $q->where('actif', true),
+            'cours' => fn ($q) => $q->with('statut', 'technologie'),
+        ])
             ->where(function ($q) use ($apprenantId) {
                 $q->whereHas('statut', fn ($s) => $s->where('value', 'PUBLIE'));
 
@@ -160,7 +166,7 @@ class ParcoursSuiviService
 
     /**
      * Progression = moyenne des cours obligatoires. TERMINEE quand tous les cours obligatoires sont
-     * TERMINEE et que les rendus de tous les projets du parcours sont CORRIGE.
+     * TERMINEE et que les rendus de tous les projets ACTIFS du parcours sont CORRIGE (règle 29).
      */
     public function recalculer(InscriptionParcours $inscription): InscriptionParcours
     {
@@ -194,7 +200,8 @@ class ParcoursSuiviService
 
         $this->attribuerProjets($inscription);
 
-        $projets = Projet::where('parcours_id', $inscription->parcours_id)->pluck('id');
+        // Règle 29 : seuls les projets actifs sont exigés ; un projet désactivé ne bloque plus le parcours.
+        $projets = Projet::where('parcours_id', $inscription->parcours_id)->where('actif', true)->pluck('id');
         $rendus = RenduProjet::with('statut')
             ->where('apprenant_id', $inscription->apprenant_id)
             ->whereIn('projet_id', $projets)
@@ -225,7 +232,7 @@ class ParcoursSuiviService
     /**
      * Recalcule toutes les inscriptions EN_COURS d'un parcours.
      * À appeler quand l'admin change la composition du parcours (cours ajouté ou retiré,
-     * obligatoire ↔ facultatif) ou ajoute un projet : les rendus sont attribués à ceux qui ont fini les cours.
+     * obligatoire ↔ facultatif) ou ses projets (ajout, activation, désactivation).
      */
     public function recalculerParcours(int $parcoursId): void
     {
@@ -238,19 +245,22 @@ class ParcoursSuiviService
             });
     }
 
-    /** Un rendu (A_FAIRE) est créé par projet quand tous les cours obligatoires sont terminés. */
+    /** Un rendu (A_FAIRE) est créé par projet ACTIF quand tous les cours obligatoires sont terminés. */
     private function attribuerProjets(InscriptionParcours $inscription): void
     {
-        Projet::where('parcours_id', $inscription->parcours_id)->get()->each(function (Projet $projet) use ($inscription) {
-            RenduProjet::firstOrCreate(
-                ['projet_id' => $projet->id, 'apprenant_id' => $inscription->apprenant_id],
-                [
-                    'date_attribution' => today(),
-                    'date_limite' => today()->addDays((int) $projet->delai_jours),
-                    'statut_id' => CodeList::idOf('StatutRendu', 'A_FAIRE'),
-                ]
-            );
-        });
+        Projet::where('parcours_id', $inscription->parcours_id)
+            ->where('actif', true)
+            ->get()
+            ->each(function (Projet $projet) use ($inscription) {
+                RenduProjet::firstOrCreate(
+                    ['projet_id' => $projet->id, 'apprenant_id' => $inscription->apprenant_id],
+                    [
+                        'date_attribution' => today(),
+                        'date_limite' => today()->addDays((int) $projet->delai_jours),
+                        'statut_id' => CodeList::idOf('StatutRendu', 'A_FAIRE'),
+                    ]
+                );
+            });
     }
 
     /** Inscription au cours de l'apprenant (créée si besoin) : un cours commun garde une seule inscription. */

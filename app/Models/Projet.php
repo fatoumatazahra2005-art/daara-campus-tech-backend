@@ -17,11 +17,14 @@ class Projet extends Model
         'delai_jours',
         'note_minimale',
         'parcours_id',
+        'actif'
     ];
 
     protected $casts = [
         'note_minimale' => 'decimal:2',
+        'actif' => 'boolean',
     ];
+
 
     public function parcours(): BelongsTo
     {

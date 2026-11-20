@@ -25,6 +25,7 @@ class StoreProjetRequest extends FormRequest
             'consigne'      => ['required', 'string', 'min:20'],
             'delai_jours'   => ['required', 'integer', 'min:1', 'max:365'],
             'note_minimale' => ['required', 'numeric', 'min:0', 'max:20'],
+
         ];
     }
 

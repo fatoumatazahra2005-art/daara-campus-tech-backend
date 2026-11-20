@@ -57,6 +57,7 @@ class ParcoursResource extends JsonResource
 
             'projets' => $this->whenLoaded('projets', fn () => $this->projets->map(fn ($projet) => [
                 'id' => $projet->id,
+                'actif' => (bool) $projet->actif,
                 'titre' => $projet->titre,
                 'consigne' => $projet->consigne,
                 'delai_jours' => (int) $projet->delai_jours,

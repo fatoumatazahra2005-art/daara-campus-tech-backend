@@ -16,6 +16,8 @@ class ProjetResource extends JsonResource
             'consigne' => $this->consigne,
             'delai_jours' => (int) $this->delai_jours,
             'note_minimale' => $this->note_minimale !== null ? (float) $this->note_minimale : null,
+            // Règle 29 : un projet inactif n'est plus attribué ni exigé (ses rendus sont conservés).
+            'actif' => (bool) ($this->actif ?? true),
             'parcours_id' => $this->parcours_id,
             'parcours' => $this->whenLoaded('parcours', fn () => [
                 'id' => $this->parcours->id,
