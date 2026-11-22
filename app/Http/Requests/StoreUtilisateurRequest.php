@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\TelephoneSenegal;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -19,7 +20,7 @@ class StoreUtilisateurRequest extends FormRequest
             'nom'        => ['required', 'string', 'max:100'],
             'prenom'     => ['required', 'string', 'max:100'],
             'email'      => ['required', 'email', 'max:255', 'unique:utilisateurs,email'],
-            'telephone'  => ['nullable', 'string', 'max:30'],
+            'telephone' => ['nullable', 'string', 'max:30', new TelephoneSenegal()],
             'password'   => ['required', 'string', 'min:8', 'confirmed'],
             'specialite' => ['required_if:role,ENCADREUR', 'nullable', 'string', 'max:150'],
         ];

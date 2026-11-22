@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Telephone;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -95,12 +97,20 @@ class Utilisateur extends Authenticatable
         return $this->hasMany(Signalement::class, 'utilisateur_id');
     }
     /** Le téléphone est toujours enregistré au format +221771234567 (s'il est valide). */
-    protected function telephone(): \Illuminate\Database\Eloquent\Casts\Attribute
+   /* protected function telephone(): \Illuminate\Database\Eloquent\Casts\Attribute
     {
         return \Illuminate\Database\Eloquent\Casts\Attribute::make(
             set: fn (?string $valeur) => blank($valeur)
                 ? null
                 : (\App\Support\Telephone::normaliser($valeur) ?? $valeur),
+        );
+    }*/
+    protected function telephone(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $valeur) => $valeur === null || trim($valeur) === ''
+                ? null
+                : (Telephone::normaliser($valeur) ?? trim($valeur)),
         );
     }
 }

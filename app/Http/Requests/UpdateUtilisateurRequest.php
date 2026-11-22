@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\TelephoneSenegal;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class UpdateUtilisateurRequest extends FormRequest
             'prenom'     => ['required', 'string', 'max:100'],
             'email'      => ['required', 'email', 'max:255',
                 Rule::unique('utilisateurs', 'email')->ignore($this->route('utilisateur')->id)],
-            'telephone'  => ['required', 'string', 'max:30'],
+            'telephone' => ['nullable', 'string', 'max:30', new TelephoneSenegal()],
             'specialite' => ['nullable', 'string', 'max:150'],
         ];
     }

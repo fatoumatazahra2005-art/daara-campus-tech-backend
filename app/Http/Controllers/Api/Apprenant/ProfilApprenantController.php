@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Apprenant;
 
 use App\Http\Controllers\Controller;
+use App\Rules\TelephoneSenegal;
 use App\Services\Apprenant\ProfilApprenantService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class ProfilApprenantController extends Controller
         return response()->json(['data' => $this->profil->profil($request->user())]);
     }
 
-    public function update(Request $request): JsonResponse
+    /*public function update(Request $request): JsonResponse
     {
         $d = $request->validate([
             'prenom' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
@@ -29,6 +30,24 @@ class ProfilApprenantController extends Controller
             'mot_de_passe_actuel' => ['nullable', 'string'],
         ], [
             'telephone.regex' => 'Numéro de téléphone invalide.',
+        ]);
+
+        return response()->json([
+            'message' => 'Profil mis à jour.',
+            'data' => $this->profil->modifier($request->user(), $d),
+        ]);
+    }
+    */
+
+    public function update(Request $request): JsonResponse
+    {
+        $d = $request->validate([
+            'prenom' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
+            'nom' => ['sometimes', 'required', 'string', 'min:2', 'max:100'],
+            'email' => ['sometimes', 'required', 'email', 'max:191'],
+            'telephone' => ['sometimes', 'nullable', 'string', 'max:30', new TelephoneSenegal()],
+            'niveau' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'mot_de_passe_actuel' => ['nullable', 'string'],
         ]);
 
         return response()->json([
