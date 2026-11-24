@@ -82,6 +82,19 @@ class InscriptionController extends Controller
         return response()->json(['data' => Presenteur::inscriptionParcours($this->parcours->abandonner($inscriptionParcours))]);
     }
 
+    public function reprendreParcours(
+        Request $request,
+        InscriptionParcours $inscriptionParcours
+    ): JsonResponse {
+        $this->posseder($request, $inscriptionParcours->apprenant_id);
+
+        return response()->json([
+            'data' => Presenteur::inscriptionParcours(
+                $this->parcours->reprendre($inscriptionParcours)
+            ),
+        ]);
+    }
+
     private function posseder(Request $request, int $apprenantId): void
     {
         abort_unless($apprenantId === $request->user()->id, 404);

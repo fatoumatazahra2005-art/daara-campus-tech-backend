@@ -31,7 +31,7 @@ class CodeListSeeder extends Seeder
             'StatutTentative'   => [true, ['EN_COURS', 'REUSSI', 'ECHOUE']],
             'MethodePaiement'   => [false, ['WAVE', 'ORANGE_MONEY', 'FREE_MONEY', 'CARTE']],
             'StatutPaiement'    => [true, ['EN_ATTENTE', 'VALIDE', 'ECHOUE']],
-            'StatutRendu'       => [true, ['A_FAIRE', 'RENDU', 'A_REPRENDRE', 'CORRIGE', 'EN_RETARD']],
+            'StatutRendu'       => [true, ['EN_ATTENTE','A_FAIRE', 'RENDU', 'A_REPRENDRE', 'CORRIGE', 'EN_RETARD']],
             'Langue' => [true, ['FR', 'EN']],
         ];
 

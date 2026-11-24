@@ -112,21 +112,52 @@ class Presenteur
         ];
     }
 
+
     public static function parcours(Parcours $p): array
     {
         $cours = $p->cours
-            ->filter(fn ($c) => ! $c->relationLoaded('statut') || $c->statut?->value === 'PUBLIE')
+            ->filter(fn ($c) =>
+                ! $c->relationLoaded('statut') ||
+                $c->statut?->value === 'PUBLIE'
+            )
             ->sortBy(fn ($c) => (int) $c->pivot->ordre);
 
         $techno = fn ($c) => $c->technologie
-            ? ['id' => $c->technologie->id, 'nom' => $c->technologie->nom, 'icone' => $c->technologie->icone]
+            ? [
+                'id' => $c->technologie->id,
+                'nom' => $c->technologie->nom,
+                'icone' => $c->technologie->icone,
+            ]
             : null;
+
+        // Déterminer si l'apprenant est déjà inscrit au parcours.
+        $estInscrit = $p->relationLoaded('inscriptions')
+            && $p->inscriptions->isNotEmpty();
+
+        // Sélectionner les projets qui lui sont réellement attribués.
+        $projets = $p->relationLoaded('projets')
+            ? $p->projets->filter(function ($projet) use ($estInscrit) {
+
+                // Pour un nouvel apprenant, les projets actifs sont affichés.
+                if (! $estInscrit) {
+                    return (bool) $projet->actif;
+                }
+
+                // Pour un apprenant inscrit, seul un rendu existant
+                // constitue une preuve d'attribution.
+                return $projet->relationLoaded('rendus')
+                    && $projet->rendus->isNotEmpty();
+            })
+            : collect();
 
         return [
             'id' => $p->id,
             'titre' => $p->titre,
             'description' => $p->description,
-            'image' => $p->image ? \Illuminate\Support\Facades\Storage::disk('public')->url($p->image) : null,
+            'image' => $p->image
+                ? \Illuminate\Support\Facades\Storage::disk('public')->url($p->image)
+                : null,
+
             'cours' => $cours->map(fn ($c) => [
                 'id' => $c->id,
                 'titre' => $c->titre,
@@ -134,17 +165,25 @@ class Presenteur
                 'obligatoire' => (bool) $c->pivot->obligatoire,
                 'technologie' => $techno($c),
             ])->values()->all(),
-            // Technologies du parcours, sans doublon, dans l'ordre des cours
-            'technologies' => $cours->map($techno)->filter()->unique('id')->values()->all(),
-            'projets' => $p->relationLoaded('projets')
-                ? $p->projets->map(fn ($pr) => [
-                    'id' => $pr->id,
-                    'titre' => $pr->titre,
-                    'delai_jours' => (int) $pr->delai_jours,
-                ])->values()->all()
-                : [],
+
+            'technologies' => $cours
+                ->map($techno)
+                ->filter()
+                ->unique('id')
+                ->values()
+                ->all(),
+
+            'projets' => $projets->map(fn ($pr) => [
+                'id' => $pr->id,
+                'titre' => $pr->titre,
+                'delai_jours' => (int) $pr->delai_jours,
+            ])->values()->all(),
+
+            'statut' => $p->statut?->value,
+            'archive' => $p->statut?->value === 'ARCHIVE',
         ];
     }
+
 
     /** Chapitre avec ses blocs (TEXTE, IMAGE, CODE). */
     public static function chapitre(Chapitre $c): array

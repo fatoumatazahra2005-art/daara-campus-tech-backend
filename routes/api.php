@@ -697,6 +697,10 @@ Route::prefix('v1')->group(function () {
                     InscriptionController::class,
                     'abandonnerParcours'
                 ]);
+                Route::post(
+                    '/inscriptions-parcours/{inscriptionParcours}/reprendre',
+                    [InscriptionController::class, 'reprendreParcours']
+                );
 
 
                 // Lecture du contenu
